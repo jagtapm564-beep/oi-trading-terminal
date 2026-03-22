@@ -13,20 +13,18 @@ headers = {
     "Authorization": f"Bearer {ACCESS_TOKEN}"
 }
 
-# Top 20 F&O Stocks + Index
 symbols = {
     "NIFTY": "NSE_INDEX|Nifty 50",
     "BANKNIFTY": "NSE_INDEX|Nifty Bank",
     "FINNIFTY": "NSE_INDEX|Nifty Financial Services",
-
     "RELIANCE": "NSE_EQ|RELIANCE",
     "HDFCBANK": "NSE_EQ|HDFCBANK",
     "ICICIBANK": "NSE_EQ|ICICIBANK",
     "SBIN": "NSE_EQ|SBIN",
     "INFY": "NSE_EQ|INFY",
     "TCS": "NSE_EQ|TCS",
-    "LT": "NSE_EQ|LT",
     "ITC": "NSE_EQ|ITC",
+    "LT": "NSE_EQ|LT",
     "AXISBANK": "NSE_EQ|AXISBANK",
     "KOTAKBANK": "NSE_EQ|KOTAKBANK",
     "TATAMOTORS": "NSE_EQ|TATAMOTORS",
@@ -35,10 +33,7 @@ symbols = {
     "HCLTECH": "NSE_EQ|HCLTECH",
     "MARUTI": "NSE_EQ|MARUTI",
     "ULTRACEMCO": "NSE_EQ|ULTRACEMCO",
-    "ADANIENT": "NSE_EQ|ADANIENT",
-    "ADANIPORTS": "NSE_EQ|ADANIPORTS",
-    "WIPRO": "NSE_EQ|WIPRO",
-    "NTPC": "NSE_EQ|NTPC"
+    "ADANIENT": "NSE_EQ|ADANIENT"
 }
 
 symbol_name = st.selectbox("Select Symbol", list(symbols.keys()))
@@ -56,6 +51,10 @@ if st.button("Load Option Data"):
     try:
         json_data = get_option_data(instrument, expiry)
         option_data = json_data.get('data', [])
+
+        if len(option_data) == 0:
+            st.error("No option data available for this symbol/expiry")
+            st.stop()
 
         strikes = []
         call_oi = []
@@ -90,7 +89,6 @@ if st.button("Load Option Data"):
             "Put LTP": put_ltp
         })
 
-        # OI Change
         df["Call OI Change"] = df["Call OI"] - df["Call Prev OI"]
         df["Put OI Change"] = df["Put OI"] - df["Put Prev OI"]
 
@@ -104,15 +102,18 @@ if st.button("Load Option Data"):
         if total_call_oi > 0:
             pcr = total_put_oi / total_call_oi
             st.metric("PCR", round(pcr, 2))
+        else:
+            pcr = 1
 
-        # Support Resistance
-        resistance = strikes[call_oi.index(max(call_oi))]
-        support = strikes[put_oi.index(max(put_oi))]
+        # Support Resistance Safe
+        if len(call_oi) > 0 and len(put_oi) > 0:
+            resistance = strikes[call_oi.index(max(call_oi))]
+            support = strikes[put_oi.index(max(put_oi))]
 
-        st.metric("OI Resistance", resistance)
-        st.metric("OI Support", support)
+            st.metric("OI Resistance", resistance)
+            st.metric("OI Support", support)
 
-        # Build Up Analysis
+        # Build Up
         buildup = []
 
         for i in range(len(df)):
@@ -132,7 +133,7 @@ if st.button("Load Option Data"):
         st.subheader("Build Up Analysis")
         st.dataframe(df[["Strike", "Build Up"]])
 
-        # Intraday Direction
+        # Direction
         if pcr > 1.2:
             st.success("Market Direction: Bullish")
         elif pcr < 0.8:
