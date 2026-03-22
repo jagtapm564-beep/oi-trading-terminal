@@ -17,19 +17,17 @@ index_symbols = {
     "NIFTY": "NSE_INDEX|Nifty 50",
     "BANKNIFTY": "NSE_INDEX|Nifty Bank",
     "FINNIFTY": "NSE_INDEX|Nifty Financial Services"
-}
-
 stock_symbols = {
-    "RELIANCE": "NSE_FO|RELIANCE",
-    "HDFCBANK": "NSE_FO|HDFCBANK",
-    "ICICIBANK": "NSE_FO|ICICIBANK",
-    "SBIN": "NSE_FO|SBIN",
-    "INFY": "NSE_FO|INFY",
-    "TCS": "NSE_FO|TCS",
-    "ITC": "NSE_FO|ITC",
-    "LT": "NSE_FO|LT",
-    "AXISBANK": "NSE_FO|AXISBANK",
-    "KOTAKBANK": "NSE_FO|KOTAKBANK"
+    "RELIANCE": "NSE_EQ|INE002A01018",
+    "HDFCBANK": "NSE_EQ|INE040A01034",
+    "ICICIBANK": "NSE_EQ|INE090A01021",
+    "SBIN": "NSE_EQ|INE062A01020",
+    "INFY": "NSE_EQ|INE009A01021",
+    "TCS": "NSE_EQ|INE467B01029",
+    "ITC": "NSE_EQ|INE154A01025",
+    "LT": "NSE_EQ|INE018A01030",
+    "AXISBANK": "NSE_EQ|INE238A01034",
+    "KOTAKBANK": "NSE_EQ|INE237A01028"
 }
 
 instrument_type = st.selectbox("Select Type", ["Index", "Stock"])
