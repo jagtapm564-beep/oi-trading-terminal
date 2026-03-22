@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import requests
 import time
-from datetime import datetime
 
 st.set_page_config(page_title="OI Trading Terminal", layout="wide")
 st.title("Options OI Trading Terminal")
@@ -14,7 +13,6 @@ headers = {
     "Authorization": f"Bearer {ACCESS_TOKEN}"
 }
 
-# Instruments
 index_symbols = {
     "NIFTY": "NSE_INDEX|Nifty 50",
     "BANKNIFTY": "NSE_INDEX|Nifty Bank",
@@ -45,7 +43,6 @@ else:
 
 expiry = st.text_input("Enter Expiry (YYYY-MM-DD)", "2026-03-26")
 
-# Index Option Chain
 def get_index_option_chain():
     url = "https://api.upstox.com/v2/option/chain"
     params = {
@@ -55,7 +52,6 @@ def get_index_option_chain():
     response = requests.get(url, headers=headers, params=params)
     return response.json()
 
-# Stock Option Contracts
 def get_option_contracts():
     url = "https://api.upstox.com/v2/option/contracts"
     params = {
@@ -65,7 +61,6 @@ def get_option_contracts():
     response = requests.get(url, headers=headers, params=params)
     return response.json()
 
-# Market Quotes
 def get_market_quotes(keys):
     url = "https://api.upstox.com/v2/market-quote/quotes"
     params = {
@@ -83,7 +78,6 @@ if st.button("Load Option Data"):
         rows = []
         for item in option_data:
             strike = item.get("strike_price", 0)
-
             call_md = item.get("call_options", {}).get("market_data", {})
             put_md = item.get("put_options", {}).get("market_data", {})
 
@@ -103,6 +97,11 @@ if st.button("Load Option Data"):
         contracts_json = get_option_contracts()
         contracts = contracts_json.get("data", [])
 
+        if not contracts:
+            st.error("No option contracts found")
+            st.write(contracts_json)
+            st.stop()
+
         instrument_keys = []
         strike_map = {}
 
@@ -116,6 +115,11 @@ if st.button("Load Option Data"):
 
         quotes_json = get_market_quotes(instrument_keys)
         quotes = quotes_json.get("data", {})
+
+        if not quotes:
+            st.error("No market quotes found")
+            st.write(quotes_json)
+            st.stop()
 
         rows = {}
 
@@ -147,10 +151,13 @@ if st.button("Load Option Data"):
 
         df = pd.DataFrame(rows.values())
 
+    if df.empty:
+        st.error("No option data available")
+        st.stop()
+
     df = df.sort_values("Strike")
     st.dataframe(df)
 
-    # PCR
     total_call = df["Call OI"].sum()
     total_put = df["Put OI"].sum()
 
@@ -158,14 +165,12 @@ if st.button("Load Option Data"):
         pcr = total_put / total_call
         st.metric("PCR", round(pcr, 2))
 
-    # Support Resistance
     resistance = df.loc[df["Call OI"].idxmax(), "Strike"]
     support = df.loc[df["Put OI"].idxmax(), "Strike"]
 
     st.metric("Resistance", resistance)
     st.metric("Support", support)
 
-# Auto Refresh
 auto = st.checkbox("Auto Refresh 30 sec")
 if auto:
     time.sleep(30)
