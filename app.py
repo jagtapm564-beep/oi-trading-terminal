@@ -39,13 +39,19 @@ if st.button("Run OI Scanner"):
             call_oi_change = 0
             put_oi_change = 0
 
-            signal = "Range"
+            price_change = 0
+oi_change = put_oi_change - call_oi_change
 
-            if put_oi_change > call_oi_change:
-                signal = "Bullish"
-            elif call_oi_change > put_oi_change:
-                signal = "Bearish"
-
+if price_change > 0 and oi_change > 0:
+    signal = "Long Build Up"
+elif price_change < 0 and oi_change > 0:
+    signal = "Short Build Up"
+elif price_change > 0 and oi_change < 0:
+    signal = "Short Covering"
+elif price_change < 0 and oi_change < 0:
+    signal = "Long Unwinding"
+else:
+    signal = "Range"
             data.append([stock, price, support, resistance, pcr, call_oi_change, put_oi_change, signal])
 
         except:
