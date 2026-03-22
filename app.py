@@ -62,7 +62,55 @@ else:
     ])
 
     st.dataframe(df)
+total_call_oi = 0
+total_put_oi = 0
 
+for row in data:
+    try:
+        total_call_oi += float(row[5])
+        total_put_oi += float(row[6])
+    except:
+        pass
+
+sentiment = "Neutral"
+
+if total_put_oi > total_call_oi:
+    sentiment = "Bullish"
+elif total_call_oi > total_put_oi:
+    sentiment = "Bearish"
+
+st.subheader("Market Sentiment")
+st.metric("Overall Market", sentiment)
+bullish = df[df["Signal"]=="Long Build Up"]
+bearish = df[df["Signal"]=="Short Build Up"]
+
+st.subheader("Top Bullish OI Build Up")
+st.dataframe(bullish)
+
+st.subheader("Top Bearish OI Build Up")
+st.dataframe(bearish)
+
+breakout = []
+
+for i,row in df.iterrows():
+    try:
+        price = float(row["Price"])
+        res = float(row["Resistance"])
+        sup = float(row["Support"])
+
+        if price > res * 0.99:
+            breakout.append([row["Stock"], "Resistance Breakout"])
+
+        if price < sup * 1.01:
+            breakout.append([row["Stock"], "Support Breakdown"])
+
+    except:
+        pass
+
+breakout_df = pd.DataFrame(breakout, columns=["Stock","Breakout"])
+
+st.subheader("Breakout Scanner")
+st.dataframe(breakout_df)
 auto_refresh = st.checkbox("Auto Refresh (30 sec)")
 
 if auto_refresh:
