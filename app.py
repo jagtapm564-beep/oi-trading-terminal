@@ -14,14 +14,25 @@ headers = {
     "Authorization": f"Bearer {ACCESS_TOKEN}"
 }
 
-symbol = st.selectbox("Select Symbol", ["NIFTY","BANKNIFTY","RELIANCE","TCS","SBIN"])
+symbols = {
+    "NIFTY": "NSE_INDEX|Nifty 50",
+    "BANKNIFTY": "NSE_INDEX|Nifty Bank",
+    "RELIANCE": "NSE_EQ|RELIANCE",
+    "TCS": "NSE_EQ|TCS",
+    "SBIN": "NSE_EQ|SBIN"
+}
+
+symbol_name = st.selectbox("Select Symbol", list(symbols.keys()))
+instrument = symbols[symbol_name]
 
 if st.button("Load Option Data"):
 
     try:
-        url = f"https://api.upstox.com/v2/option/chain?symbol={symbol}"
+        url = f"https://api.upstox.com/v2/option/chain?instrument_key={instrument}"
         r = requests.get(url, headers=headers)
-        data = r.json()['data']
+        json_data = r.json()
+
+        option_data = json_data['data']
 
         strikes = []
         call_oi = []
@@ -29,7 +40,7 @@ if st.button("Load Option Data"):
         call_oi_change = []
         put_oi_change = []
 
-        for item in data:
+        for item in option_data:
             strikes.append(item['strike_price'])
             call_oi.append(item['call_options']['open_interest'])
             put_oi.append(item['put_options']['open_interest'])
@@ -59,8 +70,8 @@ if st.button("Load Option Data"):
         st.metric("OI Resistance", resistance)
         st.metric("OI Support", support)
 
-    except:
-        st.write("Error loading option data")
+    except Exception as e:
+        st.write("Error:", e)
 
 # Auto Refresh
 auto_refresh = st.checkbox("Auto Refresh (30 sec)")
