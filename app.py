@@ -128,4 +128,5 @@ if st.button("Run OI Scanner") or auto_refresh:
 
 if auto_refresh:
     time.sleep(30)
-    st.experimental_rerun()
+    st.rerun()
+    
