@@ -14,9 +14,6 @@ headers = {
 }
 
 symbols = {
-    "NIFTY": "NSE_INDEX|Nifty 50",
-    "BANKNIFTY": "NSE_INDEX|Nifty Bank",
-    "FINNIFTY": "NSE_INDEX|Nifty Financial Services",
     "RELIANCE": "NSE_EQ|RELIANCE",
     "HDFCBANK": "NSE_EQ|HDFCBANK",
     "ICICIBANK": "NSE_EQ|ICICIBANK",
@@ -26,126 +23,106 @@ symbols = {
     "ITC": "NSE_EQ|ITC",
     "LT": "NSE_EQ|LT",
     "AXISBANK": "NSE_EQ|AXISBANK",
-    "KOTAKBANK": "NSE_EQ|KOTAKBANK",
-    "TATAMOTORS": "NSE_EQ|TATAMOTORS",
-    "TATASTEEL": "NSE_EQ|TATASTEEL",
-    "BAJFINANCE": "NSE_EQ|BAJFINANCE",
-    "HCLTECH": "NSE_EQ|HCLTECH",
-    "MARUTI": "NSE_EQ|MARUTI",
-    "ULTRACEMCO": "NSE_EQ|ULTRACEMCO",
-    "ADANIENT": "NSE_EQ|ADANIENT"
+    "KOTAKBANK": "NSE_EQ|KOTAKBANK"
 }
 
-symbol_name = st.selectbox("Select Symbol", list(symbols.keys()))
+symbol_name = st.selectbox("Select Stock", list(symbols.keys()))
 instrument = symbols[symbol_name]
 
 expiry = st.text_input("Enter Expiry Date (YYYY-MM-DD)", "2026-03-26")
 
-def get_option_data(instrument, expiry):
-    url = f"https://api.upstox.com/v2/option/chain?instrument_key={instrument}&expiry_date={expiry}"
-    response = requests.get(url, headers=headers)
+# Step 1: Get option contracts
+def get_option_contracts():
+    url = f"https://api.upstox.com/v2/option/contracts"
+    params = {
+        "instrument_key": instrument,
+        "expiry_date": expiry
+    }
+    response = requests.get(url, headers=headers, params=params)
     return response.json()
 
-if st.button("Load Option Data"):
+# Step 2: Get market quotes
+def get_market_quotes(keys):
+    url = "https://api.upstox.com/v2/market-quote/quotes"
+    params = {
+        "instrument_key": ",".join(keys)
+    }
+    response = requests.get(url, headers=headers, params=params)
+    return response.json()
 
-    try:
-        json_data = get_option_data(instrument, expiry)
-        option_data = json_data.get('data', [])
+if st.button("Load Stock Option Data"):
 
-        if len(option_data) == 0:
-            st.error("No option data available for this symbol/expiry")
-            st.stop()
+    contracts_json = get_option_contracts()
+    contracts = contracts_json.get("data", [])
 
-        strikes = []
-        call_oi = []
-        put_oi = []
-        call_ltp = []
-        put_ltp = []
-        call_prev_oi = []
-        put_prev_oi = []
+    if not contracts:
+        st.error("No option contracts found")
+        st.stop()
 
-        for item in option_data:
-            strikes.append(item.get('strike_price', 0))
+    instrument_keys = []
+    strike_map = {}
 
-            call_market = item.get('call_options', {}).get('market_data', {})
-            put_market = item.get('put_options', {}).get('market_data', {})
+    for c in contracts:
+        key = c.get("instrument_key")
+        strike = c.get("strike_price")
+        option_type = c.get("option_type")
 
-            call_oi.append(call_market.get('oi', 0))
-            put_oi.append(put_market.get('oi', 0))
+        instrument_keys.append(key)
+        strike_map[key] = (strike, option_type)
 
-            call_prev_oi.append(call_market.get('prev_oi', 0))
-            put_prev_oi.append(put_market.get('prev_oi', 0))
+    quotes_json = get_market_quotes(instrument_keys)
+    quotes = quotes_json.get("data", {})
 
-            call_ltp.append(call_market.get('ltp', 0))
-            put_ltp.append(put_market.get('ltp', 0))
+    rows = {}
 
-        df = pd.DataFrame({
-            "Strike": strikes,
-            "Call OI": call_oi,
-            "Put OI": put_oi,
-            "Call Prev OI": call_prev_oi,
-            "Put Prev OI": put_prev_oi,
-            "Call LTP": call_ltp,
-            "Put LTP": put_ltp
-        })
+    for key, q in quotes.items():
+        strike, option_type = strike_map[key]
+        oi = q.get("oi", 0)
+        prev_oi = q.get("prev_oi", 0)
+        ltp = q.get("last_price", 0)
 
-        df["Call OI Change"] = df["Call OI"] - df["Call Prev OI"]
-        df["Put OI Change"] = df["Put OI"] - df["Put Prev OI"]
+        if strike not in rows:
+            rows[strike] = {
+                "Strike": strike,
+                "Call OI": 0,
+                "Put OI": 0,
+                "Call OI Change": 0,
+                "Put OI Change": 0,
+                "Call LTP": 0,
+                "Put LTP": 0
+            }
 
-        st.subheader("Option Chain Data")
-        st.dataframe(df)
-
-        # PCR
-        total_call_oi = sum(call_oi)
-        total_put_oi = sum(put_oi)
-
-        if total_call_oi > 0:
-            pcr = total_put_oi / total_call_oi
-            st.metric("PCR", round(pcr, 2))
+        if option_type == "CE":
+            rows[strike]["Call OI"] = oi
+            rows[strike]["Call OI Change"] = oi - prev_oi
+            rows[strike]["Call LTP"] = ltp
         else:
-            pcr = 1
+            rows[strike]["Put OI"] = oi
+            rows[strike]["Put OI Change"] = oi - prev_oi
+            rows[strike]["Put LTP"] = ltp
 
-        # Support Resistance Safe
-        if len(call_oi) > 0 and len(put_oi) > 0:
-            resistance = strikes[call_oi.index(max(call_oi))]
-            support = strikes[put_oi.index(max(put_oi))]
+    df = pd.DataFrame(rows.values())
+    df = df.sort_values("Strike")
 
-            st.metric("OI Resistance", resistance)
-            st.metric("OI Support", support)
+    st.dataframe(df)
 
-        # Build Up
-        buildup = []
+    # PCR
+    total_call = df["Call OI"].sum()
+    total_put = df["Put OI"].sum()
 
-        for i in range(len(df)):
-            if df["Call OI Change"][i] > 0:
-                buildup.append("Short Build Up")
-            elif df["Put OI Change"][i] > 0:
-                buildup.append("Long Build Up")
-            elif df["Call OI Change"][i] < 0:
-                buildup.append("Short Covering")
-            elif df["Put OI Change"][i] < 0:
-                buildup.append("Long Unwinding")
-            else:
-                buildup.append("Neutral")
+    if total_call > 0:
+        pcr = total_put / total_call
+        st.metric("PCR", round(pcr, 2))
 
-        df["Build Up"] = buildup
+    # Support Resistance
+    resistance = df.loc[df["Call OI"].idxmax(), "Strike"]
+    support = df.loc[df["Put OI"].idxmax(), "Strike"]
 
-        st.subheader("Build Up Analysis")
-        st.dataframe(df[["Strike", "Build Up"]])
-
-        # Direction
-        if pcr > 1.2:
-            st.success("Market Direction: Bullish")
-        elif pcr < 0.8:
-            st.error("Market Direction: Bearish")
-        else:
-            st.warning("Market Direction: Sideways")
-
-    except Exception as e:
-        st.error(e)
+    st.metric("Resistance", resistance)
+    st.metric("Support", support)
 
 # Auto Refresh
-auto_refresh = st.checkbox("Auto Refresh (30 sec)")
-if auto_refresh:
+auto = st.checkbox("Auto Refresh 30 sec")
+if auto:
     time.sleep(30)
     st.rerun()
