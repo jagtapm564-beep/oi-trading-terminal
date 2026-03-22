@@ -13,10 +13,14 @@ headers = {
     "Authorization": f"Bearer {ACCESS_TOKEN}"
 }
 
+# Index Symbols
 index_symbols = {
     "NIFTY": "NSE_INDEX|Nifty 50",
     "BANKNIFTY": "NSE_INDEX|Nifty Bank",
     "FINNIFTY": "NSE_INDEX|Nifty Financial Services"
+}
+
+# Stock EQ Instrument Keys (Important)
 stock_symbols = {
     "RELIANCE": "NSE_EQ|INE002A01018",
     "HDFCBANK": "NSE_EQ|INE040A01034",
