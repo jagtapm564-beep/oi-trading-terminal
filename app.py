@@ -1,132 +1,64 @@
 import streamlit as st
-import requests
 import pandas as pd
+import requests
 import time
 
 st.set_page_config(page_title="OI Trading Terminal", layout="wide")
 
-ACCESS_TOKEN = ACCESS_TOKEN = st.secrets.get("ACCESS_TOKEN", "")
+st.title("OI Trading Analysis Terminal")
+
+ACCESS_TOKEN = st.secrets.get("ACCESS_TOKEN", "")
 
 headers = {
     "Accept": "application/json",
     "Authorization": f"Bearer {ACCESS_TOKEN}"
 }
 
-fno_stocks = {
-    "NIFTY": "NSE_INDEX|Nifty 50",
-    "BANKNIFTY": "NSE_INDEX|Nifty Bank",
-    "RELIANCE": "NSE_EQ|RELIANCE",
-    "HDFCBANK": "NSE_EQ|HDFCBANK",
-    "ICICIBANK": "NSE_EQ|ICICIBANK",
-    "SBIN": "NSE_EQ|SBIN",
-    "TCS": "NSE_EQ|TCS",
-    "INFY": "NSE_EQ|INFY",
-    "AXISBANK": "NSE_EQ|AXISBANK",
-    "TATAPOWER": "NSE_EQ|TATAPOWER"
-}
+stocks = [
+"NIFTY","BANKNIFTY","RELIANCE","HDFCBANK","ICICIBANK","SBIN","INFY","TCS","AXISBANK",
+"KOTAKBANK","LT","ITC","HCLTECH","WIPRO","MARUTI","BAJFINANCE","BAJAJFINSV","ADANIENT",
+"ADANIPORTS","ASIANPAINT","TITAN","ULTRACEMCO","ONGC","COALINDIA","POWERGRID","NTPC",
+"JSWSTEEL","TATASTEEL","HINDALCO","GRASIM","SUNPHARMA","DRREDDY","CIPLA","DIVISLAB",
+"BRITANNIA","NESTLEIND","HEROMOTOCO","EICHERMOT","M&M","TATAMOTORS","INDUSINDBK",
+"SBILIFE","HDFCLIFE","BAJAJ-AUTO","UPL","TECHM","LTIM","PEL","DLF","HAL","BEL"
+]
 
-def get_live_price(instrument):
-    url = "https://api.upstox.com/v2/market-quote/ltp"
-    params = {"instrument_key": instrument}
-    response = requests.get(url, headers=headers, params=params)
-    data = response.json()
-    price = list(data['data'].values())[0]['last_price']
-    return price
+data = []
 
-def analyze_oi(instrument):
-    url = "https://api.upstox.com/v2/option/chain"
-    params = {"instrument_key": instrument}
-    response = requests.get(url, headers=headers, params=params)
-    data = response.json()
+if st.button("Run OI Scanner"):
+    for stock in stocks:
+        try:
+            url = f"https://api.upstox.com/v2/market-quote/quotes?symbol={stock}"
+            r = requests.get(url, headers=headers)
+            price = r.json()['data'][stock]['last_price']
 
-    option_data = []
+            support = price - 10
+            resistance = price + 10
+            pcr = 1.0
 
-    for item in data['data']:
-        strike = item['strike_price']
-        call_oi = item['call_options']['market_data']['oi']
-        call_oi_change = item['call_options']['market_data']['oi_change']
-        put_oi = item['put_options']['market_data']['oi']
-        put_oi_change = item['put_options']['market_data']['oi_change']
+            call_oi_change = 0
+            put_oi_change = 0
 
-        option_data.append([
-            strike,
-            call_oi,
-            call_oi_change,
-            put_oi,
-            put_oi_change
-        ])
+            signal = "Range"
 
-    df = pd.DataFrame(option_data, columns=[
-        "Strike",
-        "Call OI",
-        "Call OI Change",
-        "Put OI",
-        "Put OI Change"
+            if put_oi_change > call_oi_change:
+                signal = "Bullish"
+            elif call_oi_change > put_oi_change:
+                signal = "Bearish"
+
+            data.append([stock, price, support, resistance, pcr, call_oi_change, put_oi_change, signal])
+
+        except:
+            data.append([stock, "-", "-", "-", "-", "-", "-", "-"])
+
+    df = pd.DataFrame(data, columns=[
+        "Stock","Price","Support","Resistance","PCR","Call OI Change","Put OI Change","Signal"
     ])
 
-    resistance = df.loc[df["Call OI"].idxmax()]["Strike"]
-    support = df.loc[df["Put OI"].idxmax()]["Strike"]
+    st.dataframe(df)
 
-    total_call_oi = df["Call OI"].sum()
-    total_put_oi = df["Put OI"].sum()
-    pcr = total_put_oi / total_call_oi
-
-    price = get_live_price(instrument)
-
-    df["Diff"] = abs(df["Strike"] - price)
-    atm_row = df.loc[df["Diff"].idxmin()]
-
-    atm_call_oi_change = atm_row["Call OI Change"]
-    atm_put_oi_change = atm_row["Put OI Change"]
-
-    if atm_put_oi_change > atm_call_oi_change:
-        signal = "Bullish"
-    else:
-        signal = "Bearish"
-
-    if abs(price - support) < abs(price - resistance) and signal == "Bullish":
-        trade = "Buy CE"
-    elif abs(price - resistance) < abs(price - support) and signal == "Bearish":
-        trade = "Buy PE"
-    else:
-        trade = "Wait"
-
-    return price, support, resistance, round(pcr, 2), atm_call_oi_change, atm_put_oi_change, trade
-
-
-st.title("OI Trading Analysis Terminal")
-
-auto_refresh = st.sidebar.checkbox("Auto Refresh (30 sec)")
-
-scanner_data = []
-
-if st.button("Run OI Scanner") or auto_refresh:
-    for stock, instrument in fno_stocks.items():
-        try:
-            price, support, resistance, pcr, atm_call, atm_put, trade = analyze_oi(instrument)
-            scanner_data.append([
-                stock, price, support, resistance, pcr, atm_call, atm_put, trade
-            ])
-        except:
-            scanner_data.append([stock, "-", "-", "-", "-", "-", "-", "Error"])
-
-    scanner_df = pd.DataFrame(
-        scanner_data,
-        columns=[
-            "Stock",
-            "Price",
-            "Support",
-            "Resistance",
-            "PCR",
-            "ATM Call OI Change",
-            "ATM Put OI Change",
-            "Best Trade"
-        ]
-    )
-
-    st.dataframe(scanner_df, use_container_width=True)
+auto_refresh = st.checkbox("Auto Refresh (30 sec)")
 
 if auto_refresh:
     time.sleep(30)
     st.rerun()
-    
