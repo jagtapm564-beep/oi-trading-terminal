@@ -122,7 +122,6 @@ if st.button("Run OI Scanner"):
     st.subheader("Breakout Scanner")
     st.dataframe(breakout_df)
 
-
 # Auto Refresh
 auto_refresh = st.checkbox("Auto Refresh (30 sec)")
 
