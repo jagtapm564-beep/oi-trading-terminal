@@ -7,7 +7,6 @@ st.set_page_config(page_title="OI Trading Terminal", layout="wide")
 
 st.title("OI Trading Analysis Terminal")
 
-# Access Token from Streamlit Secrets
 ACCESS_TOKEN = st.secrets["ACCESS_TOKEN"]
 
 headers = {
@@ -15,7 +14,6 @@ headers = {
     "Authorization": f"Bearer {ACCESS_TOKEN}"
 }
 
-# Top F&O Stocks
 stocks = [
 "NIFTY","BANKNIFTY","RELIANCE","HDFCBANK","ICICIBANK","SBIN","INFY","TCS","AXISBANK",
 "KOTAKBANK","LT","ITC","HCLTECH","WIPRO","MARUTI","BAJFINANCE","BAJAJFINSV","ADANIENT",
@@ -122,12 +120,8 @@ if st.button("Run OI Scanner"):
     st.subheader("Breakout Scanner")
     st.dataframe(breakout_df)
 
-# Auto Refresh
-auto_refresh = st.checkbox("Auto Refresh (30 sec)")
 
-if auto_refresh:
-    time.sleep(30)
-    st.rerun()st.dataframe(breakout_df)
+# Auto Refresh
 auto_refresh = st.checkbox("Auto Refresh (30 sec)")
 
 if auto_refresh:
