@@ -2,9 +2,10 @@ import streamlit as st
 import pandas as pd
 import requests
 import time
+from datetime import datetime
 
 st.set_page_config(page_title="OI Trading Terminal", layout="wide")
-st.title("OI Trading Analysis Terminal")
+st.title("Options OI Trading Terminal")
 
 ACCESS_TOKEN = st.secrets["ACCESS_TOKEN"]
 
@@ -13,27 +14,40 @@ headers = {
     "Authorization": f"Bearer {ACCESS_TOKEN}"
 }
 
-symbols = {
-    "RELIANCE": "NSE_EQ|RELIANCE",
-    "HDFCBANK": "NSE_EQ|HDFCBANK",
-    "ICICIBANK": "NSE_EQ|ICICIBANK",
-    "SBIN": "NSE_EQ|SBIN",
-    "INFY": "NSE_EQ|INFY",
-    "TCS": "NSE_EQ|TCS",
-    "ITC": "NSE_EQ|ITC",
-    "LT": "NSE_EQ|LT",
-    "AXISBANK": "NSE_EQ|AXISBANK",
-    "KOTAKBANK": "NSE_EQ|KOTAKBANK"
+# Instruments
+index_symbols = {
+    "NIFTY": "NSE_INDEX|Nifty 50",
+    "BANKNIFTY": "NSE_INDEX|Nifty Bank",
+    "FINNIFTY": "NSE_INDEX|Nifty Financial Services"
 }
 
-symbol_name = st.selectbox("Select Stock", list(symbols.keys()))
-instrument = symbols[symbol_name]
+stock_symbols = {
+    "RELIANCE": "NSE_FO|RELIANCE",
+    "HDFCBANK": "NSE_FO|HDFCBANK",
+    "ICICIBANK": "NSE_FO|ICICIBANK",
+    "SBIN": "NSE_FO|SBIN",
+    "INFY": "NSE_FO|INFY",
+    "TCS": "NSE_FO|TCS",
+    "ITC": "NSE_FO|ITC",
+    "LT": "NSE_FO|LT",
+    "AXISBANK": "NSE_FO|AXISBANK",
+    "KOTAKBANK": "NSE_FO|KOTAKBANK"
+}
 
-expiry = st.text_input("Enter Expiry Date (YYYY-MM-DD)", "2026-03-26")
+instrument_type = st.selectbox("Select Type", ["Index", "Stock"])
 
-# Step 1: Get option contracts
-def get_option_contracts():
-    url = f"https://api.upstox.com/v2/option/contracts"
+if instrument_type == "Index":
+    symbol_name = st.selectbox("Select Index", list(index_symbols.keys()))
+    instrument = index_symbols[symbol_name]
+else:
+    symbol_name = st.selectbox("Select Stock", list(stock_symbols.keys()))
+    instrument = stock_symbols[symbol_name]
+
+expiry = st.text_input("Enter Expiry (YYYY-MM-DD)", "2026-03-26")
+
+# Index Option Chain
+def get_index_option_chain():
+    url = "https://api.upstox.com/v2/option/chain"
     params = {
         "instrument_key": instrument,
         "expiry_date": expiry
@@ -41,7 +55,17 @@ def get_option_contracts():
     response = requests.get(url, headers=headers, params=params)
     return response.json()
 
-# Step 2: Get market quotes
+# Stock Option Contracts
+def get_option_contracts():
+    url = "https://api.upstox.com/v2/option/contracts"
+    params = {
+        "instrument_key": instrument,
+        "expiry_date": expiry
+    }
+    response = requests.get(url, headers=headers, params=params)
+    return response.json()
+
+# Market Quotes
 def get_market_quotes(keys):
     url = "https://api.upstox.com/v2/market-quote/quotes"
     params = {
@@ -50,60 +74,80 @@ def get_market_quotes(keys):
     response = requests.get(url, headers=headers, params=params)
     return response.json()
 
-if st.button("Load Stock Option Data"):
+if st.button("Load Option Data"):
 
-    contracts_json = get_option_contracts()
-    contracts = contracts_json.get("data", [])
+    if instrument_type == "Index":
+        json_data = get_index_option_chain()
+        option_data = json_data.get("data", [])
 
-    if not contracts:
-        st.error("No option contracts found")
-        st.stop()
+        rows = []
+        for item in option_data:
+            strike = item.get("strike_price", 0)
 
-    instrument_keys = []
-    strike_map = {}
+            call_md = item.get("call_options", {}).get("market_data", {})
+            put_md = item.get("put_options", {}).get("market_data", {})
 
-    for c in contracts:
-        key = c.get("instrument_key")
-        strike = c.get("strike_price")
-        option_type = c.get("option_type")
-
-        instrument_keys.append(key)
-        strike_map[key] = (strike, option_type)
-
-    quotes_json = get_market_quotes(instrument_keys)
-    quotes = quotes_json.get("data", {})
-
-    rows = {}
-
-    for key, q in quotes.items():
-        strike, option_type = strike_map[key]
-        oi = q.get("oi", 0)
-        prev_oi = q.get("prev_oi", 0)
-        ltp = q.get("last_price", 0)
-
-        if strike not in rows:
-            rows[strike] = {
+            rows.append({
                 "Strike": strike,
-                "Call OI": 0,
-                "Put OI": 0,
-                "Call OI Change": 0,
-                "Put OI Change": 0,
-                "Call LTP": 0,
-                "Put LTP": 0
-            }
+                "Call OI": call_md.get("oi", 0),
+                "Put OI": put_md.get("oi", 0),
+                "Call OI Change": call_md.get("oi", 0) - call_md.get("prev_oi", 0),
+                "Put OI Change": put_md.get("oi", 0) - put_md.get("prev_oi", 0),
+                "Call LTP": call_md.get("ltp", 0),
+                "Put LTP": put_md.get("ltp", 0),
+            })
 
-        if option_type == "CE":
-            rows[strike]["Call OI"] = oi
-            rows[strike]["Call OI Change"] = oi - prev_oi
-            rows[strike]["Call LTP"] = ltp
-        else:
-            rows[strike]["Put OI"] = oi
-            rows[strike]["Put OI Change"] = oi - prev_oi
-            rows[strike]["Put LTP"] = ltp
+        df = pd.DataFrame(rows)
 
-    df = pd.DataFrame(rows.values())
+    else:
+        contracts_json = get_option_contracts()
+        contracts = contracts_json.get("data", [])
+
+        instrument_keys = []
+        strike_map = {}
+
+        for c in contracts:
+            key = c.get("instrument_key")
+            strike = c.get("strike_price")
+            option_type = c.get("option_type")
+
+            instrument_keys.append(key)
+            strike_map[key] = (strike, option_type)
+
+        quotes_json = get_market_quotes(instrument_keys)
+        quotes = quotes_json.get("data", {})
+
+        rows = {}
+
+        for key, q in quotes.items():
+            strike, option_type = strike_map[key]
+            oi = q.get("oi", 0)
+            prev_oi = q.get("prev_oi", 0)
+            ltp = q.get("last_price", 0)
+
+            if strike not in rows:
+                rows[strike] = {
+                    "Strike": strike,
+                    "Call OI": 0,
+                    "Put OI": 0,
+                    "Call OI Change": 0,
+                    "Put OI Change": 0,
+                    "Call LTP": 0,
+                    "Put LTP": 0
+                }
+
+            if option_type == "CE":
+                rows[strike]["Call OI"] = oi
+                rows[strike]["Call OI Change"] = oi - prev_oi
+                rows[strike]["Call LTP"] = ltp
+            else:
+                rows[strike]["Put OI"] = oi
+                rows[strike]["Put OI Change"] = oi - prev_oi
+                rows[strike]["Put LTP"] = ltp
+
+        df = pd.DataFrame(rows.values())
+
     df = df.sort_values("Strike")
-
     st.dataframe(df)
 
     # PCR
