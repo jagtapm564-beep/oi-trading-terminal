@@ -5,7 +5,7 @@ import time
 
 st.set_page_config(page_title="OI Trading Terminal", layout="wide")
 
-ACCESS_TOKEN = st.secrets["ACCESS_TOKEN"]
+ACCESS_TOKEN = ACCESS_TOKEN = st.secrets.get("ACCESS_TOKEN", "")
 
 headers = {
     "Accept": "application/json",
