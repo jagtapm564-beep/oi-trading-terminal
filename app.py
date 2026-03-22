@@ -18,9 +18,11 @@ symbols = {
     "BANKNIFTY": "NSE_INDEX|Nifty Bank"
 }
 
+# Select Symbol
 symbol_name = st.selectbox("Select Symbol", list(symbols.keys()))
 instrument = symbols[symbol_name]
 
+# Expiry Input
 expiry = st.text_input("Enter Expiry Date (YYYY-MM-DD)", "2026-03-26")
 
 if st.button("Load Option Data"):
@@ -56,12 +58,14 @@ if st.button("Load Option Data"):
         st.subheader("Option Chain OI")
         st.dataframe(df)
 
+        # PCR
         total_call_oi = sum(call_oi)
         total_put_oi = sum(put_oi)
         pcr = total_put_oi / total_call_oi
 
-        st.metric("PCR", round(pcr,2))
+        st.metric("PCR", round(pcr, 2))
 
+        # Support Resistance from OI
         resistance = strikes[call_oi.index(max(call_oi))]
         support = strikes[put_oi.index(max(put_oi))]
 
