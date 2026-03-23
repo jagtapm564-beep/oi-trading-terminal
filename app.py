@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 import time
 
-st.set_page_config(page_title="F&O OI Scanner", layout="wide")
+st.set_page_config(page_title="Futures OI Scanner", layout="wide")
 st.title("Stock Futures OI Scanner")
 
 ACCESS_TOKEN = st.secrets["ACCESS_TOKEN"]
@@ -13,39 +13,43 @@ headers = {
     "Authorization": f"Bearer {ACCESS_TOKEN}"
 }
 
-# Stock Futures Instrument Keys (Near Month Futures)
-futures_symbols = {
-    "RELIANCE": "NSE_FO|RELIANCE24MARFUT",
-    "HDFCBANK": "NSE_FO|HDFCBANK24MARFUT",
-    "ICICIBANK": "NSE_FO|ICICIBANK24MARFUT",
-    "SBIN": "NSE_FO|SBIN24MARFUT",
-    "INFY": "NSE_FO|INFY24MARFUT",
-    "TCS": "NSE_FO|TCS24MARFUT",
-    "ITC": "NSE_FO|ITC24MARFUT",
-    "LT": "NSE_FO|LT24MARFUT",
-    "AXISBANK": "NSE_FO|AXISBANK24MARFUT",
-    "KOTAKBANK": "NSE_FO|KOTAKBANK24MARFUT"
-}
+# Top F&O Stocks
+stocks = [
+    "RELIANCE","HDFCBANK","ICICIBANK","SBIN","INFY",
+    "TCS","ITC","LT","AXISBANK","KOTAKBANK"
+]
 
 def get_market_quotes(keys):
     url = "https://api.upstox.com/v2/market-quote/quotes"
-    params = {
-        "instrument_key": ",".join(keys)
-    }
+    params = {"instrument_key": ",".join(keys)}
     response = requests.get(url, headers=headers, params=params)
     return response.json()
 
-if st.button("Load Futures OI Data"):
+# Example futures instrument keys (update monthly)
+futures_keys = {
+    "RELIANCE": "NSE_FO|RELIANCE26MARFUT",
+    "HDFCBANK": "NSE_FO|HDFCBANK26MARFUT",
+    "ICICIBANK": "NSE_FO|ICICIBANK26MARFUT",
+    "SBIN": "NSE_FO|SBIN26MARFUT",
+    "INFY": "NSE_FO|INFY26MARFUT",
+    "TCS": "NSE_FO|TCS26MARFUT",
+    "ITC": "NSE_FO|ITC26MARFUT",
+    "LT": "NSE_FO|LT26MARFUT",
+    "AXISBANK": "NSE_FO|AXISBANK26MARFUT",
+    "KOTAKBANK": "NSE_FO|KOTAKBANK26MARFUT"
+}
 
-    instrument_keys = list(futures_symbols.values())
+if st.button("Load Futures Data"):
+
+    instrument_keys = list(futures_keys.values())
     quotes_json = get_market_quotes(instrument_keys)
     quotes = quotes_json.get("data", {})
 
     rows = []
 
-    for name, key in futures_symbols.items():
+    for stock, key in futures_keys.items():
         q = quotes.get(key, {})
-        
+
         ltp = q.get("last_price", 0)
         prev_close = q.get("ohlc", {}).get("close", 0)
         oi = q.get("oi", 0)
@@ -66,7 +70,7 @@ if st.button("Load Futures OI Data"):
             signal = "Neutral"
 
         rows.append({
-            "Stock": name,
+            "Stock": stock,
             "Price": ltp,
             "Price Change": round(price_change, 2),
             "OI": oi,
